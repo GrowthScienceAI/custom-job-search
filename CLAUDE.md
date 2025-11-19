@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A job search aggregator that searches across multiple job boards with a single query, focusing on AI, Product Management, and Marketing roles. Currently integrates with Remotive API and uses mock data for demonstration.
+A job search aggregator that searches across multiple job boards with a single query, focusing on AI, Product Management, and Marketing roles. Currently integrates with 5 job board APIs (Remotive, Jobicy, Arbeitnow, The Muse, Adzuna) plus mock data for demonstration.
 
 **Tech Stack:**
 - Next.js 16.0.3 (App Router)
@@ -45,11 +45,12 @@ All data fetching uses Next.js server actions, not API routes.
 **Location:** [src/lib/search/searchEngine.ts](src/lib/search/searchEngine.ts)
 
 Key function: `searchJobs(query: string)` marked with `"use server"`
-- Fetches from Remotive API with 1-hour cache (`revalidate: 3600`)
+- Fetches from 5 job board APIs in parallel using `Promise.allSettled`
+- Each API has 1-hour cache (`revalidate: 3600`)
 - Filters local mock jobs by query
 - Combines and deduplicates results (by title + company)
 - Ranks by relevance (title match > company match > description match)
-- Returns max 20 results
+- Returns combined results from all sources
 
 **Important:** Helper functions in server action files must NOT be exported (Next.js constraint).
 
@@ -58,21 +59,23 @@ Key function: `searchJobs(query: string)` marked with `"use server"`
 1. User types in search input ([src/app/page.tsx](src/app/page.tsx))
 2. Debounced effect (500ms) triggers
 3. Client calls `searchJobs()` server action
-4. Server fetches Remotive API + filters mock data
-5. Results rendered via `ResultsList` component
+4. Server fetches from all 5 APIs in parallel + filters mock data
+5. Failed API calls are gracefully handled (don't block other sources)
+6. Results combined, deduplicated, and ranked
+7. Results rendered via `ResultsList` component
 
 ### Job Data Model
 
 ```typescript
 interface Job {
-  id: string;              // Format: "remotive-123" or "mock-1"
+  id: string;              // Format: "remotive-123", "jobicy-456", "arbeitnow-789", "muse-101", "adzuna-202", "mock-1"
   title: string;
   company: string;
   location: string;
   salary?: string;
-  postedDate: string;      // Human-readable (e.g., "2 days ago")
+  postedDate: string;      // Human-readable (e.g., "Jan 15, 2025")
   description: string;
-  sourceBoard: string;     // Which job board
+  sourceBoard: string;     // Which job board ("Remotive", "Jobicy", "Arbeitnow", "The Muse", "Adzuna")
   tags: string[];
   url: string;             // Application link
 }
@@ -121,10 +124,16 @@ Example:
 
 ### Data Sources
 
-- **Real data:** Remotive API (`https://remotive.com/api/remote-jobs`)
+**Active Integrations:**
+- **Remotive** - Remote tech jobs (no auth required)
+- **Jobicy** - Remote jobs across industries (no auth required)
+- **Arbeitnow** - Remote-first tech jobs (no auth required)
+- **The Muse** - PM/Marketing/Startup jobs (requires free API key)
+- **Adzuna** - Job aggregator with salary data (requires free API credentials)
 - **Mock data:** 5 sample jobs in [src/lib/data/mockJobs.ts](src/lib/data/mockJobs.ts)
-- **Job boards:** 60+ boards cataloged in [src/lib/data/jobBoards.ts](src/lib/data/jobBoards.ts) but not yet integrated
-- **Mock URLs:** Job links use placeholder domains (aijobs.ai, lennysjobs.com, etc. are not real)
+
+**Cataloged but Not Integrated:**
+- 60+ boards in [src/lib/data/jobBoards.ts](src/lib/data/jobBoards.ts) (most lack public APIs)
 
 ## Styling
 
@@ -146,12 +155,55 @@ className={cn("base-classes", conditionalClass && "extra-classes", className)}
 
 ## External Integrations
 
-### Remotive API
+### Job Board APIs
 
+All APIs are called in parallel using `Promise.allSettled` for resilience. Each has 1-hour caching.
+
+#### 1. Remotive API
 - **Endpoint:** `https://remotive.com/api/remote-jobs?search={query}`
 - **Auth:** None required
-- **Caching:** 1 hour (`next: { revalidate: 3600 }`)
-- **Response:** Array of job objects with title, company, description, etc.
+- **Features:** Direct search support, remote tech jobs
+- **Response:** `{ jobs: [...] }`
+
+#### 2. Jobicy API
+- **Endpoint:** `https://jobicy.com/api/v2/remote-jobs?count=50`
+- **Auth:** None required
+- **Features:** Fetches latest 50, manual filtering client-side
+- **Response:** `{ jobs: [...] }`
+
+#### 3. Arbeitnow API
+- **Endpoint:** `https://www.arbeitnow.com/api/job-board-api`
+- **Auth:** None required
+- **Features:** Remote-first jobs, manual filtering client-side
+- **Response:** `{ data: [...] }`
+
+#### 4. The Muse API (Optional)
+- **Endpoint:** `https://www.themuse.com/api/public/jobs?api_key={key}`
+- **Auth:** Free API key required - Register at [themuse.com/developers](https://www.themuse.com/developers)
+- **Env Var:** `THE_MUSE_API_KEY`
+- **Features:** Excellent for PM/Marketing roles, startup jobs
+- **Response:** `{ results: [...] }`
+- **Graceful Degradation:** Skips if API key not provided
+
+#### 5. Adzuna API (Optional)
+- **Endpoint:** `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id={id}&app_key={key}&what={query}`
+- **Auth:** Free credentials required - Register at [developer.adzuna.com](https://developer.adzuna.com)
+- **Env Vars:** `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`
+- **Features:** Aggregates multiple sources, includes salary data
+- **Free Tier:** 1000 calls/month
+- **Response:** `{ results: [...] }`
+- **Graceful Degradation:** Skips if credentials not provided
+
+### Environment Variables
+
+Create a `.env.local` file (see [.env.local.example](.env.local.example)):
+```bash
+THE_MUSE_API_KEY=your_key_here        # Optional
+ADZUNA_APP_ID=your_id_here            # Optional
+ADZUNA_APP_KEY=your_key_here          # Optional
+```
+
+**Note:** App works with 3 job boards (Remotive, Jobicy, Arbeitnow) without any API keys.
 
 ## Configuration Files
 

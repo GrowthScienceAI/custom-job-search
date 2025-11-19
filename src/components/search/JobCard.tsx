@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Heart, ExternalLink } from "lucide-react";
@@ -20,6 +23,41 @@ interface JobCardProps {
 }
 
 export function JobCard({ job }: JobCardProps) {
+    const [isSaved, setIsSaved] = useState(false);
+
+    useEffect(() => {
+        // Check if job is already saved
+        const saved = localStorage.getItem("savedJobs");
+        if (saved) {
+            try {
+                const savedJobs = JSON.parse(saved);
+                setIsSaved(savedJobs.some((saved: any) => saved.id === job.id));
+            } catch (error) {
+                console.error("Error checking saved jobs:", error);
+            }
+        }
+    }, [job.id]);
+
+    const toggleSave = () => {
+        const saved = localStorage.getItem("savedJobs");
+        let savedJobs = saved ? JSON.parse(saved) : [];
+
+        if (isSaved) {
+            // Remove from saved
+            savedJobs = savedJobs.filter((saved: any) => saved.id !== job.id);
+        } else {
+            // Add to saved
+            savedJobs.push({
+                ...job,
+                savedAt: new Date().toISOString(),
+                status: "saved",
+            });
+        }
+
+        localStorage.setItem("savedJobs", JSON.stringify(savedJobs));
+        setIsSaved(!isSaved);
+    };
+
     return (
         <div className="group relative flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
             <div className="flex items-start justify-between">
@@ -29,8 +67,13 @@ export function JobCard({ job }: JobCardProps) {
                     </h3>
                     <p className="text-sm font-medium text-gray-700">{job.company}</p>
                 </div>
-                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-red-500">
-                    <Heart className="h-5 w-5" />
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className={isSaved ? "text-red-500 hover:text-red-600" : "text-gray-400 hover:text-red-500"}
+                    onClick={toggleSave}
+                >
+                    <Heart className={`h-5 w-5 ${isSaved ? "fill-current" : ""}`} />
                 </Button>
             </div>
 
