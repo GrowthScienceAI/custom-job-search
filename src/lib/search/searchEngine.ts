@@ -80,7 +80,7 @@ export async function searchJobs(query: string, filters?: SearchFilters): Promis
     return results;
 }
 
-export function deduplicateJobs(jobs: Job[]): Job[] {
+function deduplicateJobs(jobs: Job[]): Job[] {
     const seen = new Set<string>();
     return jobs.filter((job) => {
         const key = `${job.title.toLowerCase()}|${job.company.toLowerCase()}`;
@@ -92,7 +92,7 @@ export function deduplicateJobs(jobs: Job[]): Job[] {
     });
 }
 
-export function rankJobs(jobs: Job[], query: string): Job[] {
+function rankJobs(jobs: Job[], query: string): Job[] {
     if (!query) return jobs;
 
     const lowerQuery = query.toLowerCase();
