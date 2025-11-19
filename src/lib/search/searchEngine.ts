@@ -9,13 +9,25 @@ export interface SearchFilters {
 }
 
 export async function searchJobs(query: string, filters?: SearchFilters): Promise<Job[]> {
-    // Fetch from APIs in parallel
-    const [remotiveResults, jobicyResults, arbeitnowResults, museResults, adzunaResults] = await Promise.allSettled([
+    // Fetch from all APIs in parallel
+    const [
+        remotiveResults,
+        jobicyResults,
+        arbeitnowResults,
+        museResults,
+        adzunaResults,
+        jsearchResults,
+        joobleResults,
+        himalayasResults
+    ] = await Promise.allSettled([
         fetchRemotiveJobs(query),
         fetchJobicyJobs(query),
         fetchArbeitnowJobs(query),
         fetchMuseJobs(query),
-        fetchAdzunaJobs(query)
+        fetchAdzunaJobs(query),
+        fetchJSearchJobs(query),
+        fetchJoobleJobs(query),
+        fetchHimalayasJobs(query)
     ]);
 
     const remotiveJobs = remotiveResults.status === 'fulfilled' ? remotiveResults.value : [];
@@ -23,9 +35,21 @@ export async function searchJobs(query: string, filters?: SearchFilters): Promis
     const arbeitnowJobs = arbeitnowResults.status === 'fulfilled' ? arbeitnowResults.value : [];
     const museJobs = museResults.status === 'fulfilled' ? museResults.value : [];
     const adzunaJobs = adzunaResults.status === 'fulfilled' ? adzunaResults.value : [];
+    const jsearchJobs = jsearchResults.status === 'fulfilled' ? jsearchResults.value : [];
+    const joobleJobs = joobleResults.status === 'fulfilled' ? joobleResults.value : [];
+    const himalayasJobs = himalayasResults.status === 'fulfilled' ? himalayasResults.value : [];
 
     // Combine Results (only real API jobs, no mock data)
-    let results = [...remotiveJobs, ...jobicyJobs, ...arbeitnowJobs, ...museJobs, ...adzunaJobs];
+    let results = [
+        ...remotiveJobs,
+        ...jobicyJobs,
+        ...arbeitnowJobs,
+        ...museJobs,
+        ...adzunaJobs,
+        ...jsearchJobs,
+        ...joobleJobs,
+        ...himalayasJobs
+    ];
 
     // Apply Filters
     if (filters?.category && filters.category.length > 0) {
@@ -252,6 +276,156 @@ async function fetchAdzunaJobs(query: string): Promise<Job[]> {
     }
 }
 
+async function fetchJSearchJobs(query: string): Promise<Job[]> {
+    try {
+        const rapidApiKey = process.env.RAPID_API_KEY;
+
+        if (!rapidApiKey) {
+            console.warn("RapidAPI key not found. Skipping JSearch jobs.");
+            return [];
+        }
+
+        const searchQuery = encodeURIComponent(query || "remote");
+        const url = `https://jsearch.p.rapidapi.com/search?query=${searchQuery}&page=1&num_pages=1`;
+
+        const res = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-RapidAPI-Key': rapidApiKey,
+                'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
+            },
+            next: { revalidate: 3600 }
+        });
+
+        if (!res.ok) return [];
+
+        const data = await res.json();
+        if (!data.data) return [];
+
+        return data.data.slice(0, 20).map((job: any) => ({
+            id: `jsearch-${job.job_id}`,
+            title: job.job_title,
+            company: job.employer_name || "Unknown Company",
+            location: job.job_city && job.job_state
+                ? `${job.job_city}, ${job.job_state}`
+                : job.job_country || "Remote",
+            salary: job.job_min_salary && job.job_max_salary
+                ? `$${Math.round(job.job_min_salary / 1000)}k - $${Math.round(job.job_max_salary / 1000)}k`
+                : undefined,
+            postedDate: job.job_posted_at_datetime_utc
+                ? new Date(job.job_posted_at_datetime_utc).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                : "Recently",
+            description: job.job_description
+                ? job.job_description.replace(/<[^>]*>?/gm, '').slice(0, 300) + "..."
+                : "No description available.",
+            sourceBoard: `JSearch (${job.job_publisher || 'Multiple'})`,
+            tags: job.job_employment_type ? [job.job_employment_type] : [],
+            url: job.job_apply_link || job.job_google_link || "#"
+        }));
+    } catch (error) {
+        console.error("Error fetching from JSearch:", error);
+        return [];
+    }
+}
+
+async function fetchJoobleJobs(query: string): Promise<Job[]> {
+    try {
+        const joobleKey = process.env.JOOBLE_API_KEY;
+
+        if (!joobleKey) {
+            console.warn("Jooble API key not found. Skipping Jooble jobs.");
+            return [];
+        }
+
+        const url = `https://jooble.org/api/${joobleKey}`;
+        const searchQuery = query || "remote";
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                keywords: searchQuery,
+                location: ""
+            }),
+            next: { revalidate: 3600 }
+        });
+
+        if (!res.ok) return [];
+
+        const data = await res.json();
+        if (!data.jobs) return [];
+
+        return data.jobs.slice(0, 20).map((job: any) => ({
+            id: `jooble-${job.id || Math.random()}`,
+            title: job.title,
+            company: job.company || "Unknown Company",
+            location: job.location || "Remote",
+            salary: job.salary || undefined,
+            postedDate: job.updated
+                ? new Date(job.updated).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                : "Recently",
+            description: job.snippet
+                ? job.snippet.replace(/<[^>]*>?/gm, '').slice(0, 300) + "..."
+                : "No description available.",
+            sourceBoard: "Jooble",
+            tags: job.type ? [job.type] : [],
+            url: job.link || "#"
+        }));
+    } catch (error) {
+        console.error("Error fetching from Jooble:", error);
+        return [];
+    }
+}
+
+async function fetchHimalayasJobs(query: string): Promise<Job[]> {
+    try {
+        // Himalayas API is free without a key
+        const url = `https://himalayas.app/jobs/api`;
+
+        const res = await fetch(url, { next: { revalidate: 3600 } });
+        if (!res.ok) return [];
+
+        const data = await res.json();
+        if (!data) return [];
+
+        let jobs = Array.isArray(data) ? data : (data.jobs || []);
+
+        // Filter by query if provided
+        if (query) {
+            const lowerQuery = query.toLowerCase();
+            jobs = jobs.filter((job: any) =>
+                job.title?.toLowerCase().includes(lowerQuery) ||
+                job.company?.toLowerCase().includes(lowerQuery) ||
+                job.description?.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        return jobs.slice(0, 20).map((job: any) => ({
+            id: `himalayas-${job.id || job.slug}`,
+            title: job.title,
+            company: job.company || "Unknown Company",
+            location: job.location || "Remote",
+            salary: job.salary_min && job.salary_max
+                ? `$${Math.round(job.salary_min / 1000)}k - $${Math.round(job.salary_max / 1000)}k`
+                : undefined,
+            postedDate: job.published_at
+                ? new Date(job.published_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                : "Recently",
+            description: job.description
+                ? job.description.slice(0, 300) + "..."
+                : "No description available.",
+            sourceBoard: "Himalayas",
+            tags: job.tags || [],
+            url: job.url || `https://himalayas.app/jobs/${job.slug}`
+        }));
+    } catch (error) {
+        console.error("Error fetching from Himalayas:", error);
+        return [];
+    }
+}
+
 function deduplicateJobs(jobs: Job[]): Job[] {
     const seen = new Set<string>();
     return jobs.filter((job) => {
@@ -337,14 +511,21 @@ function calculateKeywordScore(job: Job, query: string): number {
 
 function calculateBoardSpecialtyScore(job: Job, query: string): number {
     // Categorize boards by specialty
-    const aiBoards = ['Remotive'];
+    const aiBoards = ['Remotive', 'Himalayas'];
     const pmBoards = ['The Muse'];
     const marketingBoards = ['Jobicy'];
-    const generalBoards = ['Adzuna', 'Arbeitnow'];
+    const generalBoards = ['Adzuna', 'Arbeitnow', 'Jooble'];
+    // JSearch is multi-source (LinkedIn, Indeed, Glassdoor, etc.)
+    const multiSourceBoards = /JSearch/i;
 
     const isAIQuery = /ai|machine learning|ml|data science|artificial intelligence/i.test(query);
     const isPMQuery = /product manager|pm|product|scrum|agile/i.test(query);
     const isMarketingQuery = /marketing|seo|growth|content/i.test(query);
+
+    // Check if it's a multi-source board (JSearch)
+    if (multiSourceBoards.test(job.sourceBoard)) {
+        return 90; // High score for aggregator that includes LinkedIn/Indeed
+    }
 
     if (isAIQuery && aiBoards.includes(job.sourceBoard)) {
         return 100;
@@ -377,17 +558,20 @@ function calculateFreshnessScore(postedDate: string): number {
 }
 
 function calculateSourceQualityScore(sourceBoard: string): number {
-    // Tier 1: Specialized, curated boards
-    const tier1 = ['Remotive', 'The Muse'];
-    if (tier1.includes(sourceBoard)) return 95;
+    // Tier 1: Multi-source aggregators (LinkedIn, Indeed, Glassdoor, ZipRecruiter)
+    if (/JSearch/i.test(sourceBoard)) return 100;
 
-    // Tier 2: Well-established specialty boards
-    const tier2 = ['Jobicy', 'Arbeitnow'];
-    if (tier2.includes(sourceBoard)) return 85;
+    // Tier 2: Specialized, curated boards
+    const tier2 = ['Remotive', 'The Muse', 'Himalayas'];
+    if (tier2.includes(sourceBoard)) return 95;
 
-    // Tier 3: API-integrated platforms
-    const tier3 = ['Adzuna'];
-    if (tier3.includes(sourceBoard)) return 75;
+    // Tier 3: Well-established specialty boards
+    const tier3 = ['Jobicy', 'Arbeitnow', 'Jooble'];
+    if (tier3.includes(sourceBoard)) return 85;
+
+    // Tier 4: API-integrated platforms
+    const tier4 = ['Adzuna'];
+    if (tier4.includes(sourceBoard)) return 75;
 
     // Default
     return 60;
