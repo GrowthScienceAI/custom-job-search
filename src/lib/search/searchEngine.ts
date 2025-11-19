@@ -10,36 +10,16 @@ export interface SearchFilters {
 }
 
 export async function searchJobs(query: string, filters?: SearchFilters): Promise<Job[]> {
-    // 1. Fetch from Remotive API
-    let remotiveJobs: Job[] = [];
-    try {
-        const url = query
-            ? `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}`
-            : `https://remotive.com/api/remote-jobs?limit=20`;
+    // Fetch from APIs in parallel
+    const [remotiveResults, jobicyResults] = await Promise.allSettled([
+        fetchRemotiveJobs(query),
+        fetchJobicyJobs(query)
+    ]);
 
-        const res = await fetch(url, { next: { revalidate: 3600 } }); // Cache for 1 hour
-        if (res.ok) {
-            const data = await res.json();
-            if (data.jobs) {
-                remotiveJobs = data.jobs.slice(0, 20).map((job: any) => ({
-                    id: `remotive-${job.id}`,
-                    title: job.title,
-                    company: job.company_name,
-                    location: job.candidate_required_location,
-                    salary: job.salary || undefined,
-                    postedDate: new Date(job.publication_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
-                    description: job.description ? job.description.replace(/<[^>]*>?/gm, '').slice(0, 300) + "..." : "No description available.",
-                    sourceBoard: "Remotive",
-                    tags: job.tags || [],
-                    url: job.url
-                }));
-            }
-        }
-    } catch (error) {
-        console.error("Error fetching from Remotive:", error);
-    }
+    const remotiveJobs = remotiveResults.status === 'fulfilled' ? remotiveResults.value : [];
+    const jobicyJobs = jobicyResults.status === 'fulfilled' ? jobicyResults.value : [];
 
-    // 2. Process Mock Jobs
+    // Process Mock Jobs
     let localResults = [...mockJobs];
     if (query) {
         const lowerQuery = query.toLowerCase();
@@ -52,10 +32,10 @@ export async function searchJobs(query: string, filters?: SearchFilters): Promis
         );
     }
 
-    // 3. Combine Results
-    let results = [...localResults, ...remotiveJobs];
+    // Combine Results
+    let results = [...localResults, ...remotiveJobs, ...jobicyJobs];
 
-    // 4. Apply Filters
+    // Apply Filters
     if (filters?.category && filters.category.length > 0) {
         results = results.filter((job) =>
             filters.category!.some((cat) =>
@@ -71,13 +51,86 @@ export async function searchJobs(query: string, filters?: SearchFilters): Promis
         );
     }
 
-    // 5. Deduplicate
+    // Deduplicate
     results = deduplicateJobs(results);
 
-    // 6. Rank
+    // Rank
     results = rankJobs(results, query);
 
     return results;
+}
+
+async function fetchRemotiveJobs(query: string): Promise<Job[]> {
+    try {
+        const url = query
+            ? `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}`
+            : `https://remotive.com/api/remote-jobs?limit=20`;
+
+        const res = await fetch(url, { next: { revalidate: 3600 } });
+        if (!res.ok) return [];
+
+        const data = await res.json();
+        if (!data.jobs) return [];
+
+        return data.jobs.slice(0, 20).map((job: any) => ({
+            id: `remotive-${job.id}`,
+            title: job.title,
+            company: job.company_name,
+            location: job.candidate_required_location,
+            salary: job.salary || undefined,
+            postedDate: new Date(job.publication_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+            description: job.description ? job.description.replace(/<[^>]*>?/gm, '').slice(0, 300) + "..." : "No description available.",
+            sourceBoard: "Remotive",
+            tags: job.tags || [],
+            url: job.url
+        }));
+    } catch (error) {
+        console.error("Error fetching from Remotive:", error);
+        return [];
+    }
+}
+
+async function fetchJobicyJobs(query: string): Promise<Job[]> {
+    try {
+        // Jobicy doesn't support direct text search well, so we fetch recent jobs and filter manually if needed
+        // or use their tag search if the query matches a known tag.
+        // For simplicity and robustness, we'll fetch the latest 50 jobs.
+        const url = `https://jobicy.com/api/v2/remote-jobs?count=50`;
+
+        const res = await fetch(url, { next: { revalidate: 3600 } });
+        if (!res.ok) return [];
+
+        const data = await res.json();
+        if (!data.jobs) return [];
+
+        let jobs = data.jobs.map((job: any) => ({
+            id: `jobicy-${job.id}`,
+            title: job.jobTitle,
+            company: job.companyName,
+            location: job.jobGeo || "Remote",
+            salary: job.jobType ? job.jobType[0] : undefined, // Jobicy puts type (Full-time) here usually
+            postedDate: new Date(job.pubDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+            description: job.jobDescription ? job.jobDescription.replace(/<[^>]*>?/gm, '').slice(0, 300) + "..." : "No description available.",
+            sourceBoard: "Jobicy",
+            tags: [...(job.jobIndustry || []), ...(job.jobType || []), job.jobLevel].filter(Boolean),
+            url: job.url
+        }));
+
+        // Manual filtering for Jobicy since API doesn't support broad text search
+        if (query) {
+            const lowerQuery = query.toLowerCase();
+            jobs = jobs.filter((job: Job) =>
+                job.title.toLowerCase().includes(lowerQuery) ||
+                job.company.toLowerCase().includes(lowerQuery) ||
+                job.description.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        return jobs;
+    } catch (error) {
+        console.error("Error fetching from Jobicy:", error);
+        return [];
+    }
 }
 
 function deduplicateJobs(jobs: Job[]): Job[] {
