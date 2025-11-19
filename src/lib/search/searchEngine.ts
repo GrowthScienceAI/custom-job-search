@@ -1,7 +1,6 @@
 "use server";
 
 import { Job } from "@/components/search/JobCard";
-import { mockJobs } from "@/lib/data/mockJobs";
 
 export interface SearchFilters {
     category?: string[];
@@ -25,21 +24,8 @@ export async function searchJobs(query: string, filters?: SearchFilters): Promis
     const museJobs = museResults.status === 'fulfilled' ? museResults.value : [];
     const adzunaJobs = adzunaResults.status === 'fulfilled' ? adzunaResults.value : [];
 
-    // Process Mock Jobs
-    let localResults = [...mockJobs];
-    if (query) {
-        const lowerQuery = query.toLowerCase();
-        localResults = localResults.filter(
-            (job) =>
-                job.title.toLowerCase().includes(lowerQuery) ||
-                job.company.toLowerCase().includes(lowerQuery) ||
-                job.description.toLowerCase().includes(lowerQuery) ||
-                job.tags.some((tag) => tag.toLowerCase().includes(lowerQuery))
-        );
-    }
-
-    // Combine Results
-    let results = [...localResults, ...remotiveJobs, ...jobicyJobs, ...arbeitnowJobs, ...museJobs, ...adzunaJobs];
+    // Combine Results (only real API jobs, no mock data)
+    let results = [...remotiveJobs, ...jobicyJobs, ...arbeitnowJobs, ...museJobs, ...adzunaJobs];
 
     // Apply Filters
     if (filters?.category && filters.category.length > 0) {
@@ -351,9 +337,9 @@ function calculateKeywordScore(job: Job, query: string): number {
 
 function calculateBoardSpecialtyScore(job: Job, query: string): number {
     // Categorize boards by specialty
-    const aiBoards = ['Remotive', 'Mock Jobs'];
-    const pmBoards = ['The Muse', 'Mock Jobs'];
-    const marketingBoards = ['Jobicy', 'Mock Jobs'];
+    const aiBoards = ['Remotive'];
+    const pmBoards = ['The Muse'];
+    const marketingBoards = ['Jobicy'];
     const generalBoards = ['Adzuna', 'Arbeitnow'];
 
     const isAIQuery = /ai|machine learning|ml|data science|artificial intelligence/i.test(query);
@@ -392,7 +378,7 @@ function calculateFreshnessScore(postedDate: string): number {
 
 function calculateSourceQualityScore(sourceBoard: string): number {
     // Tier 1: Specialized, curated boards
-    const tier1 = ['Remotive', 'The Muse', 'Mock Jobs'];
+    const tier1 = ['Remotive', 'The Muse'];
     if (tier1.includes(sourceBoard)) return 95;
 
     // Tier 2: Well-established specialty boards
