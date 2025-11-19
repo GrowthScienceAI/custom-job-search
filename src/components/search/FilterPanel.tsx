@@ -4,7 +4,25 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Label } from "@/components/ui/Label";
 import { Button } from "@/components/ui/Button";
 
-export function FilterPanel() {
+interface FilterPanelProps {
+    selectedCategories: string[];
+    selectedLocations: string[];
+    selectedLevels: string[];
+    onCategoryChange: (category: string) => void;
+    onLocationChange: (location: string) => void;
+    onLevelChange: (level: string) => void;
+    onReset: () => void;
+}
+
+export function FilterPanel({
+    selectedCategories,
+    selectedLocations,
+    selectedLevels,
+    onCategoryChange,
+    onLocationChange,
+    onLevelChange,
+    onReset,
+}: FilterPanelProps) {
     return (
         <div className="w-64 space-y-8">
             <div>
@@ -12,8 +30,12 @@ export function FilterPanel() {
                 <div className="space-y-3">
                     {["AI Consulting/Research", "Product Management", "Digital Marketing", "General"].map((category) => (
                         <div key={category} className="flex items-center space-x-2">
-                            <Checkbox id={`category-${category}`} />
-                            <Label htmlFor={`category-${category}`}>{category}</Label>
+                            <Checkbox
+                                id={`category-${category}`}
+                                checked={selectedCategories.includes(category)}
+                                onCheckedChange={() => onCategoryChange(category)}
+                            />
+                            <Label htmlFor={`category-${category}`} className="cursor-pointer">{category}</Label>
                         </div>
                     ))}
                 </div>
@@ -24,8 +46,12 @@ export function FilterPanel() {
                 <div className="space-y-3">
                     {["Remote", "Milwaukee", "National"].map((location) => (
                         <div key={location} className="flex items-center space-x-2">
-                            <Checkbox id={`location-${location}`} />
-                            <Label htmlFor={`location-${location}`}>{location}</Label>
+                            <Checkbox
+                                id={`location-${location}`}
+                                checked={selectedLocations.includes(location)}
+                                onCheckedChange={() => onLocationChange(location)}
+                            />
+                            <Label htmlFor={`location-${location}`} className="cursor-pointer">{location}</Label>
                         </div>
                     ))}
                 </div>
@@ -36,14 +62,18 @@ export function FilterPanel() {
                 <div className="space-y-3">
                     {["Entry Level", "Mid-Level", "Senior", "Executive"].map((level) => (
                         <div key={level} className="flex items-center space-x-2">
-                            <Checkbox id={`level-${level}`} />
-                            <Label htmlFor={`level-${level}`}>{level}</Label>
+                            <Checkbox
+                                id={`level-${level}`}
+                                checked={selectedLevels.includes(level)}
+                                onCheckedChange={() => onLevelChange(level)}
+                            />
+                            <Label htmlFor={`level-${level}`} className="cursor-pointer">{level}</Label>
                         </div>
                     ))}
                 </div>
             </div>
 
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full" onClick={onReset}>
                 Reset Filters
             </Button>
         </div>

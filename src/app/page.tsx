@@ -12,11 +12,20 @@ export default function Home() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Filter states
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
+
   useEffect(() => {
     const fetchJobs = async () => {
       setLoading(true);
       try {
-        const results = await searchJobs(query);
+        const results = await searchJobs(query, {
+          category: selectedCategories,
+          location: selectedLocations,
+          experienceLevel: selectedLevels,
+        });
         setJobs(results);
       } catch (error) {
         console.error("Failed to fetch jobs:", error);
@@ -31,7 +40,31 @@ export default function Home() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, selectedCategories, selectedLocations, selectedLevels]);
+
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
+    );
+  };
+
+  const handleLocationChange = (location: string) => {
+    setSelectedLocations((prev) =>
+      prev.includes(location) ? prev.filter((l) => l !== location) : [...prev, location]
+    );
+  };
+
+  const handleLevelChange = (level: string) => {
+    setSelectedLevels((prev) =>
+      prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level]
+    );
+  };
+
+  const handleResetFilters = () => {
+    setSelectedCategories([]);
+    setSelectedLocations([]);
+    setSelectedLevels([]);
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -67,7 +100,15 @@ export default function Home() {
 
       <div className="flex flex-col gap-8 lg:flex-row">
         <aside className="hidden lg:block">
-          <FilterPanel />
+          <FilterPanel
+            selectedCategories={selectedCategories}
+            selectedLocations={selectedLocations}
+            selectedLevels={selectedLevels}
+            onCategoryChange={handleCategoryChange}
+            onLocationChange={handleLocationChange}
+            onLevelChange={handleLevelChange}
+            onReset={handleResetFilters}
+          />
         </aside>
         <main className="flex-1">
           {loading ? (
