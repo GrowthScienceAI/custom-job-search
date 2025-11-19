@@ -11,7 +11,7 @@ export const mockJobs: Job[] = [
         description: "We are looking for an experienced AI Consultant to help our clients implement cutting-edge machine learning solutions. You will work directly with stakeholders to define requirements and deliver scalable AI models.",
         sourceBoard: "AIJobs.ai",
         tags: ["AI", "Consulting", "Remote"],
-        url: "https://aijobs.ai",
+        url: "https://aijobs.ai/jobs/senior-ai-consultant-techforward-1",
     },
     {
         id: "2",
@@ -23,7 +23,7 @@ export const mockJobs: Job[] = [
         description: "Join our fast-growing product team to drive user acquisition and retention. You will own the growth roadmap and experiment with new features to optimize the funnel.",
         sourceBoard: "Lenny's Jobs",
         tags: ["Product Management", "Growth", "Hybrid"],
-        url: "https://www.lennysjobs.com",
+        url: "https://www.lennysjobs.com/jobs/product-manager-growth-scaleup-2",
     },
     {
         id: "3",
@@ -35,7 +35,7 @@ export const mockJobs: Job[] = [
         description: "Lead our digital marketing campaigns across social media, SEO, and PPC. You will manage a small team and report directly to the CMO.",
         sourceBoard: "MilwaukeeJobs.com",
         tags: ["Marketing", "Milwaukee", "On-site"],
-        url: "https://milwaukeejobs.com",
+        url: "https://milwaukeejobs.com/jobs/digital-marketing-manager-creative-agency-3",
     },
     {
         id: "4",
@@ -47,7 +47,7 @@ export const mockJobs: Job[] = [
         description: "Conduct fundamental research in reinforcement learning and deep learning. Publish papers in top conferences and contribute to our open-source projects.",
         sourceBoard: "AAAI Career Center",
         tags: ["AI", "Research", "London"],
-        url: "https://www.aaai.org/jobs",
+        url: "https://www.aaai.org/jobs/ai-research-scientist-deepmind-4",
     },
     {
         id: "5",
@@ -59,6 +59,6 @@ export const mockJobs: Job[] = [
         description: "We need a TPM to manage our cloud infrastructure products. You should have a strong technical background and experience with AWS/Azure.",
         sourceBoard: "Dice",
         tags: ["Product Management", "Technical", "Remote"],
-        url: "https://www.dice.com",
+        url: "https://www.dice.com/jobs/technical-product-manager-cloudcorp-5",
     },
 ];
