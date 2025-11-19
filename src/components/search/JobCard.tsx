@@ -58,6 +58,31 @@ export function JobCard({ job }: JobCardProps) {
         setIsSaved(!isSaved);
     };
 
+    // Validate URL and provide fallback
+    const getJobUrl = () => {
+        if (!job.url) return "#";
+
+        try {
+            // Check if URL is valid
+            new URL(job.url);
+            return job.url;
+        } catch {
+            // If invalid, fallback to job board homepage
+            const boardUrls: Record<string, string> = {
+                "Remotive": "https://remotive.com",
+                "Jobicy": "https://jobicy.com",
+                "Arbeitnow": "https://www.arbeitnow.com",
+                "The Muse": "https://www.themuse.com/jobs",
+                "Adzuna": "https://www.adzuna.com/jobs",
+                "Mock Jobs": "#",
+            };
+            return boardUrls[job.sourceBoard] || "#";
+        }
+    };
+
+    const jobUrl = getJobUrl();
+    const isValidUrl = jobUrl !== "#";
+
     return (
         <div className="group relative flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
             <div className="flex items-start justify-between">
@@ -89,11 +114,17 @@ export function JobCard({ job }: JobCardProps) {
 
             <div className="flex items-center justify-between pt-2">
                 <span className="text-xs text-gray-500">{job.postedDate}</span>
-                <Button size="sm" className="gap-2" asChild>
-                    <a href={job.url} target="_blank" rel="noopener noreferrer">
-                        Apply Now <ExternalLink className="h-4 w-4" />
-                    </a>
-                </Button>
+                {isValidUrl ? (
+                    <Button size="sm" className="gap-2" asChild>
+                        <a href={jobUrl} target="_blank" rel="noopener noreferrer">
+                            View on {job.sourceBoard} <ExternalLink className="h-4 w-4" />
+                        </a>
+                    </Button>
+                ) : (
+                    <Button size="sm" variant="outline" disabled className="gap-2">
+                        URL Not Available
+                    </Button>
+                )}
             </div>
         </div>
     );
